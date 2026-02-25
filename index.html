@@ -1013,6 +1013,37 @@
     .font-medium {
       font-weight: 500
     }
+
+    .table-list-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 0;
+      border-bottom: 1px solid var(--border)
+    }
+
+    .table-list-row:last-child {
+      border-bottom: none
+    }
+
+    .table-list-name {
+      font-weight: 600;
+      font-size: 14px
+    }
+
+    .table-list-badge {
+      font-size: 11px;
+      color: var(--accent);
+      background: rgba(37,99,235,0.1);
+      padding: 2px 6px;
+      border-radius: 4px;
+      margin-left: 6px
+    }
+
+    .table-list-actions {
+      display: flex;
+      gap: 6px
+    }
   </style>
 </head>
 
@@ -1022,8 +1053,10 @@
       <div>
         <h1>Finances</h1>
         <p class="muted">Simple bills & payments manager — works offline and saves in your browser</p>
+        <p id="tableIndicator" style="display:none;font-size:12px;color:var(--accent);font-weight:600;margin:2px 0 0 0;"></p>
       </div>
       <div class="actions">
+        <button id="manageTablesBtn" class="btn ghost">Tables</button>
         <button id="passwordBtn" class="btn ghost">Password</button>
         <button id="exportJson" class="btn ghost">Export JSON</button>
         <button id="importJson" class="btn ghost">Import JSON</button>
@@ -1099,7 +1132,7 @@
   <div class="lock-screen" id="lockScreen">
     <div class="lock-box">
       <h2>Finances Locked</h2>
-      <p>Enter your password to access</p>
+      <p>Enter a table password to access</p>
       <div class="lock-error" id="lockError">Incorrect password</div>
       <input type="password" id="lockPassword" placeholder="Password" autocomplete="off">
       <button class="btn" id="unlockBtn">Unlock</button>
@@ -1127,6 +1160,33 @@
     </div>
   </div>
 
+  <!-- Manage Tables Modal -->
+  <div class="modal-overlay" id="manageTablesModal">
+    <div class="modal" style="max-width:460px">
+      <h2>Manage Tables</h2>
+      <div id="tablesListContainer"></div>
+      <hr style="margin:16px 0;border:none;border-top:1px solid var(--border)">
+      <h3 style="font-size:14px;margin:0 0 12px 0;color:var(--muted)">Add Sub-Table</h3>
+      <div class="modal-field">
+        <label for="newTableName">Table Name</label>
+        <input type="text" id="newTableName" placeholder="e.g. Partner">
+      </div>
+      <div class="modal-field">
+        <label for="newTablePassword">Password</label>
+        <input type="password" id="newTablePassword" placeholder="Unique password">
+      </div>
+      <div class="modal-field">
+        <label for="newTablePasswordConfirm">Confirm Password</label>
+        <input type="password" id="newTablePasswordConfirm" placeholder="Confirm">
+      </div>
+      <div class="lock-error" id="newTableError"></div>
+      <div class="modal-actions">
+        <button class="btn ghost" id="manageTablesClose">Close</button>
+        <button class="btn" id="createTableBtn">Create</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Edit Bill Modal -->
   <div class="modal-overlay" id="editModal">
     <div class="modal">
@@ -1147,8 +1207,15 @@
   </div>
 
   <script>
-    // Password protection
-    const PW_KEY = 'finances_password';
+    // ── Multi-table storage constants ──────────────────────────────────────────
+    const REGISTRY_KEY = 'finances_tables_registry';
+    const TABLE_KEY_PREFIX = 'finances_table_';
+
+    // ── Global state ───────────────────────────────────────────────────────────
+    let registry = null;
+    let currentTableId = null;
+
+    // ── DOM refs ───────────────────────────────────────────────────────────────
     const lockScreen = document.getElementById('lockScreen');
     const lockPassword = document.getElementById('lockPassword');
     const lockError = document.getElementById('lockError');
@@ -1161,47 +1228,130 @@
     const passwordError = document.getElementById('passwordError');
     const removePasswordBtn = document.getElementById('removePassword');
 
-    function getStoredPassword() {
-      return localStorage.getItem(PW_KEY) || '';
+    // ── UUID helper ────────────────────────────────────────────────────────────
+    function generateUUID() {
+      return ([1e7]+-1e3+-4e3+-8e3+-1e11).replace(/[018]/g, c =>
+        (c ^ crypto.getRandomValues(new Uint8Array(1))[0] & 15 >> c / 4).toString(16)
+      );
     }
 
-    function hasPassword() {
-      return getStoredPassword() !== '';
+    // ── Migration from v1 schema ───────────────────────────────────────────────
+    function migrateIfNeeded() {
+      if (localStorage.getItem(REGISTRY_KEY)) return; // already migrated
+      const oldRows = localStorage.getItem('finances_v1_rows');
+      // Build registry with a main table entry
+      const mainId = generateUUID();
+      const oldPassword = localStorage.getItem('finances_password') || '';
+      const oldCash = parseFloat(localStorage.getItem('finances_available_cash')) || 0;
+      let mainRows = [];
+      if (oldRows) {
+        try { mainRows = JSON.parse(oldRows); } catch (e) { mainRows = initialRows.slice(); }
+      }
+      const newRegistry = {
+        version: 2,
+        mainTableId: mainId,
+        tables: [{ id: mainId, name: 'Main', password: oldPassword, isMain: true }]
+      };
+      const mainTableData = { id: mainId, rows: mainRows, availableCash: oldCash };
+      localStorage.setItem(REGISTRY_KEY, JSON.stringify(newRegistry));
+      localStorage.setItem(TABLE_KEY_PREFIX + mainId, JSON.stringify(mainTableData));
+      // Remove old keys
+      localStorage.removeItem('finances_v1_rows');
+      localStorage.removeItem('finances_password');
+      localStorage.removeItem('finances_available_cash');
     }
 
-    function checkPassword(input) {
-      return input === getStoredPassword();
+    // ── Registry helpers ───────────────────────────────────────────────────────
+    function loadRegistry() {
+      try {
+        const raw = localStorage.getItem(REGISTRY_KEY);
+        if (raw) { registry = JSON.parse(raw); return; }
+      } catch (e) {}
+      // Fallback: create a fresh registry
+      const mainId = generateUUID();
+      registry = { version: 2, mainTableId: mainId, tables: [{ id: mainId, name: 'Main', password: '', isMain: true }] };
+      const mainTableData = { id: mainId, rows: initialRows.slice(), availableCash: 0 };
+      localStorage.setItem(REGISTRY_KEY, JSON.stringify(registry));
+      localStorage.setItem(TABLE_KEY_PREFIX + mainId, JSON.stringify(mainTableData));
     }
 
-    function setPassword(pw) {
-      if (pw) {
-        localStorage.setItem(PW_KEY, pw);
+    function saveRegistry() {
+      localStorage.setItem(REGISTRY_KEY, JSON.stringify(registry));
+    }
+
+    function getTableByPassword(pw) {
+      if (!pw) return null;
+      return registry.tables.find(t => t.password === pw) || null;
+    }
+
+    function getTableById(id) {
+      return registry.tables.find(t => t.id === id) || null;
+    }
+
+    // ── Per-table data helpers ─────────────────────────────────────────────────
+    function loadTableData(id) {
+      try {
+        const raw = localStorage.getItem(TABLE_KEY_PREFIX + id);
+        if (raw) {
+          const data = JSON.parse(raw);
+          rows = Array.isArray(data.rows) ? data.rows : [];
+          availableCash = typeof data.availableCash === 'number' ? data.availableCash : 0;
+          return;
+        }
+      } catch (e) {}
+      rows = [];
+      availableCash = 0;
+    }
+
+    function saveTableData() {
+      if (!currentTableId) return;
+      localStorage.setItem(TABLE_KEY_PREFIX + currentTableId, JSON.stringify({ id: currentTableId, rows: rows, availableCash: availableCash }));
+    }
+
+    // ── Table indicator ────────────────────────────────────────────────────────
+    function updateTableIndicator(name) {
+      const el = document.getElementById('tableIndicator');
+      if (name) {
+        el.textContent = 'Viewing: ' + name;
+        el.style.display = 'block';
       } else {
-        localStorage.removeItem(PW_KEY);
+        el.style.display = 'none';
       }
     }
 
-    // Initialize lock screen
+    // ── Lock screen ────────────────────────────────────────────────────────────
     function initLockScreen() {
-      if (hasPassword()) {
+      const mainTable = registry.tables.find(t => t.isMain);
+      if (!mainTable.password) {
+        // No password on main — auto-unlock into main table
+        currentTableId = mainTable.id;
+        loadTableData(mainTable.id);
+        lockScreen.classList.add('hidden');
+        updateTableIndicator(mainTable.name);
+      } else {
         lockScreen.classList.remove('hidden');
         lockPassword.focus();
-      } else {
-        lockScreen.classList.add('hidden');
       }
     }
 
-    // Unlock
     unlockBtn.addEventListener('click', tryUnlock);
     lockPassword.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') tryUnlock();
     });
 
     function tryUnlock() {
-      if (checkPassword(lockPassword.value)) {
+      const input = lockPassword.value;
+      const match = getTableByPassword(input);
+      if (match) {
+        currentTableId = match.id;
+        loadTableData(match.id);
         lockScreen.classList.add('hidden');
         lockPassword.value = '';
         lockError.classList.remove('show');
+        updateTableIndicator(match.name);
+        rows.forEach(r => { if (!r.hasOwnProperty('dueDate')) r.dueDate = ''; });
+        sortRowsByDueDate();
+        render();
       } else {
         lockError.classList.add('show');
         lockPassword.value = '';
@@ -1209,7 +1359,7 @@
       }
     }
 
-    // Password modal
+    // ── Password modal (manages current table's password) ─────────────────────
     document.getElementById('passwordBtn').addEventListener('click', openPasswordModal);
     document.getElementById('passwordCancel').addEventListener('click', closePasswordModal);
     document.getElementById('passwordSave').addEventListener('click', savePassword);
@@ -1225,13 +1375,10 @@
       newPassword.value = '';
       confirmPassword.value = '';
 
-      if (hasPassword()) {
-        passwordModalTitle.textContent = 'Change Password';
-        removePasswordBtn.style.display = 'inline-block';
-      } else {
-        passwordModalTitle.textContent = 'Set Password';
-        removePasswordBtn.style.display = 'none';
-      }
+      const entry = getTableById(currentTableId);
+      const hasPw = entry && entry.password;
+      passwordModalTitle.textContent = hasPw ? 'Change Table Password' : 'Set Table Password';
+      removePasswordBtn.style.display = hasPw ? 'inline-block' : 'none';
 
       passwordModal.classList.add('active');
       newPassword.focus();
@@ -1244,7 +1391,6 @@
     function savePassword() {
       passwordError.classList.remove('show');
 
-      // Validate new password
       if (!newPassword.value) {
         passwordError.textContent = 'Please enter a password';
         passwordError.classList.add('show');
@@ -1257,24 +1403,218 @@
         return;
       }
 
-      setPassword(newPassword.value);
+      // Check password uniqueness across tables (excluding current table)
+      const conflict = registry.tables.find(t => t.id !== currentTableId && t.password === newPassword.value);
+      if (conflict) {
+        passwordError.textContent = 'This password is already used by another table';
+        passwordError.classList.add('show');
+        return;
+      }
+
+      const entry = getTableById(currentTableId);
+      if (entry) {
+        entry.password = newPassword.value;
+        saveRegistry();
+      }
       closePasswordModal();
       alert('Password saved!');
     }
 
     function removePassword() {
-      if (confirm('Remove password protection?')) {
-        setPassword('');
+      if (confirm('Remove password from this table?')) {
+        const entry = getTableById(currentTableId);
+        if (entry) {
+          entry.password = '';
+          saveRegistry();
+        }
         closePasswordModal();
         alert('Password removed!');
       }
     }
 
-    // Initialize lock on page load
-    initLockScreen();
+    // ── Manage Tables modal ────────────────────────────────────────────────────
+    document.getElementById('manageTablesBtn').addEventListener('click', openManageTablesModal);
+    document.getElementById('manageTablesClose').addEventListener('click', closeManageTablesModal);
+    document.getElementById('createTableBtn').addEventListener('click', createSubTable);
+    document.getElementById('manageTablesModal').addEventListener('click', (e) => {
+      if (e.target === document.getElementById('manageTablesModal')) closeManageTablesModal();
+    });
 
-    // Simple finances manager - localStorage key
-    const LS_KEY = 'finances_v1_rows';
+    function openManageTablesModal() {
+      renderTablesList();
+      document.getElementById('newTableName').value = '';
+      document.getElementById('newTablePassword').value = '';
+      document.getElementById('newTablePasswordConfirm').value = '';
+      document.getElementById('newTableError').textContent = '';
+      document.getElementById('newTableError').classList.remove('show');
+      document.getElementById('manageTablesModal').classList.add('active');
+    }
+
+    function closeManageTablesModal() {
+      document.getElementById('manageTablesModal').classList.remove('active');
+    }
+
+    function renderTablesList() {
+      const container = document.getElementById('tablesListContainer');
+      container.innerHTML = '';
+      registry.tables.forEach(t => {
+        const row = document.createElement('div');
+        row.className = 'table-list-row';
+
+        const left = document.createElement('div');
+        left.style.display = 'flex';
+        left.style.alignItems = 'center';
+        const nameSpan = document.createElement('span');
+        nameSpan.className = 'table-list-name';
+        nameSpan.textContent = t.name;
+        left.appendChild(nameSpan);
+        if (t.isMain) {
+          const badge = document.createElement('span');
+          badge.className = 'table-list-badge';
+          badge.textContent = 'MAIN';
+          left.appendChild(badge);
+        }
+        if (t.id === currentTableId) {
+          const activeBadge = document.createElement('span');
+          activeBadge.className = 'table-list-badge';
+          activeBadge.style.background = 'rgba(5,150,105,0.1)';
+          activeBadge.style.color = 'var(--ok)';
+          activeBadge.style.marginLeft = '4px';
+          activeBadge.textContent = 'ACTIVE';
+          left.appendChild(activeBadge);
+        }
+
+        const actions = document.createElement('div');
+        actions.className = 'table-list-actions';
+
+        if (!t.isMain) {
+          const cloneBtn = document.createElement('button');
+          cloneBtn.className = 'btn ghost';
+          cloneBtn.style.fontSize = '12px';
+          cloneBtn.style.padding = '4px 8px';
+          cloneBtn.textContent = 'Clone from Main';
+          cloneBtn.addEventListener('click', () => cloneMainToTable(t.id));
+          actions.appendChild(cloneBtn);
+
+          const delBtn = document.createElement('button');
+          delBtn.className = 'btn danger';
+          delBtn.style.fontSize = '12px';
+          delBtn.style.padding = '4px 8px';
+          delBtn.textContent = 'Delete';
+          delBtn.addEventListener('click', () => deleteSubTable(t.id));
+          actions.appendChild(delBtn);
+        }
+
+        row.appendChild(left);
+        row.appendChild(actions);
+        container.appendChild(row);
+      });
+    }
+
+    function createSubTable() {
+      const errEl = document.getElementById('newTableError');
+      errEl.classList.remove('show');
+      const name = document.getElementById('newTableName').value.trim();
+      const pw = document.getElementById('newTablePassword').value;
+      const pwConfirm = document.getElementById('newTablePasswordConfirm').value;
+
+      if (!name) {
+        errEl.textContent = 'Please enter a table name';
+        errEl.classList.add('show');
+        return;
+      }
+      if (!pw) {
+        errEl.textContent = 'Please enter a password';
+        errEl.classList.add('show');
+        return;
+      }
+      if (pw !== pwConfirm) {
+        errEl.textContent = 'Passwords do not match';
+        errEl.classList.add('show');
+        return;
+      }
+      if (getTableByPassword(pw)) {
+        errEl.textContent = 'This password is already in use by another table';
+        errEl.classList.add('show');
+        return;
+      }
+
+      const newId = generateUUID();
+      registry.tables.push({ id: newId, name: name, password: pw, isMain: false });
+      saveRegistry();
+      const newData = { id: newId, rows: [], availableCash: 0 };
+      localStorage.setItem(TABLE_KEY_PREFIX + newId, JSON.stringify(newData));
+
+      document.getElementById('newTableName').value = '';
+      document.getElementById('newTablePassword').value = '';
+      document.getElementById('newTablePasswordConfirm').value = '';
+      renderTablesList();
+      alert('Table "' + name + '" created!');
+    }
+
+    function deleteSubTable(id) {
+      const entry = getTableById(id);
+      if (!entry || entry.isMain) return;
+      if (!confirm('Delete table "' + entry.name + '"? All its data will be lost.')) return;
+
+      registry.tables = registry.tables.filter(t => t.id !== id);
+      saveRegistry();
+      localStorage.removeItem(TABLE_KEY_PREFIX + id);
+
+      // If we were viewing the deleted table, switch to main
+      if (currentTableId === id) {
+        const mainEntry = registry.tables.find(t => t.isMain);
+        currentTableId = mainEntry.id;
+        loadTableData(mainEntry.id);
+        updateTableIndicator(mainEntry.name);
+        rows.forEach(r => { if (!r.hasOwnProperty('dueDate')) r.dueDate = ''; });
+        sortRowsByDueDate();
+        render();
+      }
+
+      renderTablesList();
+    }
+
+    function cloneMainToTable(targetId) {
+      const mainId = registry.mainTableId;
+      const mainEntry = getTableById(mainId);
+      if (!mainEntry) return;
+
+      const targetEntry = getTableById(targetId);
+      if (!targetEntry) return;
+
+      if (!confirm('Clone all data from Main to "' + targetEntry.name + '"? This will replace all existing data in that table.')) return;
+
+      const mainRaw = localStorage.getItem(TABLE_KEY_PREFIX + mainId);
+      if (!mainRaw) { alert('Main table data not found.'); return; }
+      const mainData = JSON.parse(mainRaw);
+
+      const clonedRows = mainData.rows.map(r => ({
+        owes: r.owes,
+        bill: r.bill,
+        paid: r.paid,
+        dueDate: r.dueDate,
+        paidBool: r.paidBool || false
+      }));
+
+      const targetRaw = localStorage.getItem(TABLE_KEY_PREFIX + targetId);
+      const targetData = targetRaw ? JSON.parse(targetRaw) : { id: targetId, availableCash: 0 };
+      targetData.rows = clonedRows;
+      targetData.availableCash = mainData.availableCash;
+      localStorage.setItem(TABLE_KEY_PREFIX + targetId, JSON.stringify(targetData));
+
+      // If currently viewing the target table, reload
+      if (currentTableId === targetId) {
+        rows = clonedRows;
+        availableCash = targetData.availableCash;
+        sortRowsByDueDate();
+        render();
+      }
+
+      alert('Cloned successfully!');
+    }
+
+    // Simple finances manager - localStorage key (legacy, unused — kept for initialRows)
 
     // Example initial data (converted from the screenshot you provided)
     const initialRows = [
@@ -1378,7 +1718,7 @@
         rows[editingRowIndex].owes = modalBillName.value;
         rows[editingRowIndex].dueDate = modalDueDate.value;
         sortRowsByDueDate();
-        saveRows();
+        saveTableData();
         render();
       }
       closeEditModal();
@@ -1395,20 +1735,7 @@
       if (e.key === 'Enter' && editModal.classList.contains('active')) saveEditModal();
     });
 
-    let rows = loadRows();
-
-    function loadRows() {
-      try {
-        const raw = localStorage.getItem(LS_KEY);
-        if (raw) { return JSON.parse(raw); }
-      } catch (e) { }
-      // fallback to initial rows
-      return initialRows.slice();
-    }
-
-    function saveRows() {
-      localStorage.setItem(LS_KEY, JSON.stringify(rows));
-    }
+    let rows = [];
 
     const tbody = document.getElementById('tbody');
     const mobileTable = document.getElementById('mobileTable');
@@ -1460,18 +1787,18 @@
       billInput.setAttribute('placeholder', '$0.00');
       billInput.addEventListener('blur', e => {
         const raw = (e.target.value || '').trim();
-        if (!raw) { rows[idx].bill = ''; e.target.value = ''; saveRows(); updateSummary(); return; }
+        if (!raw) { rows[idx].bill = ''; e.target.value = ''; saveTableData(); updateSummary(); return; }
         if (!/\d/.test(raw)) { e.target.classList.add('invalid'); return; }
         const n = parseMoney(raw);
         rows[idx].bill = formatMoney(n);
         e.target.value = rows[idx].bill;
         e.target.classList.remove('invalid');
-        saveRows(); updateSummary();
+        saveTableData(); updateSummary();
       });
       billInput.addEventListener('input', e => { e.target.classList.remove('invalid'); });
       billInput.addEventListener('dblclick', e => e.target.select());
       const billClearBtn = document.createElement('button'); billClearBtn.className = 'clear-btn'; billClearBtn.innerHTML = '×'; billClearBtn.title = 'Clear';
-      billClearBtn.addEventListener('click', () => { billInput.value = ''; rows[idx].bill = ''; saveRows(); updateSummary(); });
+      billClearBtn.addEventListener('click', () => { billInput.value = ''; rows[idx].bill = ''; saveTableData(); updateSummary(); });
       billContainer.appendChild(billInput); billContainer.appendChild(billClearBtn);
       bill.appendChild(billContainer);
 
@@ -1502,7 +1829,6 @@
         if (paidAmt > 0 && bal > 0) {
           // PARTIAL → transfer: permanently deduct paid from available cash, roll balance into bill
           availableCash = Math.max(0, availableCash - paidAmt);
-          localStorage.setItem('finances_available_cash', availableCash);
           rows[idx].bill = formatMoney(bal);
           rows[idx].paid = '';
           rows[idx].paidBool = false;
@@ -1515,7 +1841,7 @@
           rows[idx].paid = '';
           rows[idx].paidBool = false;
         }
-        saveRows(); render(); updateSummary();
+        saveTableData(); render(); updateSummary();
       });
       paid.appendChild(paidBtn);
 
@@ -1527,19 +1853,19 @@
       paidInput.setAttribute('placeholder', '$0.00');
       paidInput.addEventListener('blur', e => {
         const raw = (e.target.value || '').trim();
-        if (!raw) { rows[idx].paid = ''; rows[idx].paidBool = false; e.target.value = ''; saveRows(); updateSummary(); render(); return; }
+        if (!raw) { rows[idx].paid = ''; rows[idx].paidBool = false; e.target.value = ''; saveTableData(); updateSummary(); render(); return; }
         if (!/\d/.test(raw)) { e.target.classList.add('invalid'); return; }
         const n = parseMoney(raw);
         rows[idx].paid = formatMoney(n);
         rows[idx].paidBool = n > 0;
         e.target.value = rows[idx].paid;
         e.target.classList.remove('invalid');
-        saveRows(); updateSummary(); render();
+        saveTableData(); updateSummary(); render();
       });
       paidInput.addEventListener('input', e => { e.target.classList.remove('invalid'); });
       paidInput.addEventListener('dblclick', e => e.target.select());
       const paidClearBtn = document.createElement('button'); paidClearBtn.className = 'clear-btn'; paidClearBtn.innerHTML = '×'; paidClearBtn.title = 'Clear';
-      paidClearBtn.addEventListener('click', () => { paidInput.value = ''; rows[idx].paid = ''; rows[idx].paidBool = false; saveRows(); updateSummary(); render(); });
+      paidClearBtn.addEventListener('click', () => { paidInput.value = ''; rows[idx].paid = ''; rows[idx].paidBool = false; saveTableData(); updateSummary(); render(); });
       paidContainer.appendChild(paidInput); paidContainer.appendChild(paidClearBtn);
       paidAmt.appendChild(paidContainer);
 
@@ -1563,9 +1889,9 @@
       // Row actions - inline with the row
       const actionsCell = document.createElement('td'); actionsCell.className = 'cell';
       const actionsDiv = document.createElement('div'); actionsDiv.className = 'row-actions';
-      const up = document.createElement('button'); up.className = 'btn ghost'; up.innerHTML = '↑'; up.title = 'Move up'; up.addEventListener('click', () => { if (idx > 0) { const a = rows[idx - 1]; rows[idx - 1] = rows[idx]; rows[idx] = a; saveRows(); render(); } });
-      const down = document.createElement('button'); down.className = 'btn ghost'; down.innerHTML = '↓'; down.title = 'Move down'; down.addEventListener('click', () => { if (idx < rows.length - 1) { const a = rows[idx + 1]; rows[idx + 1] = rows[idx]; rows[idx] = a; saveRows(); render(); } });
-      const del = document.createElement('button'); del.className = 'btn danger'; del.innerHTML = '×'; del.title = 'Delete'; del.addEventListener('click', () => { if (confirm('Delete this bill?')) { rows.splice(idx, 1); saveRows(); render(); updateSummary(); } });
+      const up = document.createElement('button'); up.className = 'btn ghost'; up.innerHTML = '↑'; up.title = 'Move up'; up.addEventListener('click', () => { if (idx > 0) { const a = rows[idx - 1]; rows[idx - 1] = rows[idx]; rows[idx] = a; saveTableData(); render(); } });
+      const down = document.createElement('button'); down.className = 'btn ghost'; down.innerHTML = '↓'; down.title = 'Move down'; down.addEventListener('click', () => { if (idx < rows.length - 1) { const a = rows[idx + 1]; rows[idx + 1] = rows[idx]; rows[idx] = a; saveTableData(); render(); } });
+      const del = document.createElement('button'); del.className = 'btn danger'; del.innerHTML = '×'; del.title = 'Delete'; del.addEventListener('click', () => { if (confirm('Delete this bill?')) { rows.splice(idx, 1); saveTableData(); render(); updateSummary(); } });
       actionsDiv.appendChild(up); actionsDiv.appendChild(down); actionsDiv.appendChild(del);
       actionsCell.appendChild(actionsDiv);
 
@@ -1624,13 +1950,13 @@
       billInput.placeholder = '$0';
       billInput.addEventListener('blur', e => {
         const raw = (e.target.value || '').trim();
-        if (!raw) { rows[idx].bill = ''; e.target.value = ''; saveRows(); updateSummary(); render(); return; }
+        if (!raw) { rows[idx].bill = ''; e.target.value = ''; saveTableData(); updateSummary(); render(); return; }
         if (!/\d/.test(raw)) { e.target.classList.add('invalid'); return; }
         const n = parseMoney(raw);
         rows[idx].bill = formatMoney(n);
         e.target.value = rows[idx].bill;
         e.target.classList.remove('invalid');
-        saveRows(); updateSummary(); render();
+        saveTableData(); updateSummary(); render();
       });
       const billClearBtn = document.createElement('button');
       billClearBtn.className = 'mobile-clear-btn';
@@ -1638,7 +1964,7 @@
       billClearBtn.addEventListener('click', () => {
         billInput.value = '';
         rows[idx].bill = '';
-        saveRows();
+        saveTableData();
         updateSummary();
         render();
       });
@@ -1657,14 +1983,14 @@
       paidInput.placeholder = '$0';
       paidInput.addEventListener('blur', e => {
         const raw = (e.target.value || '').trim();
-        if (!raw) { rows[idx].paid = ''; rows[idx].paidBool = false; e.target.value = ''; saveRows(); updateSummary(); render(); return; }
+        if (!raw) { rows[idx].paid = ''; rows[idx].paidBool = false; e.target.value = ''; saveTableData(); updateSummary(); render(); return; }
         if (!/\d/.test(raw)) { e.target.classList.add('invalid'); return; }
         const n = parseMoney(raw);
         rows[idx].paid = formatMoney(n);
         rows[idx].paidBool = n > 0;
         e.target.value = rows[idx].paid;
         e.target.classList.remove('invalid');
-        saveRows(); updateSummary(); render();
+        saveTableData(); updateSummary(); render();
       });
       const paidClearBtn = document.createElement('button');
       paidClearBtn.className = 'mobile-clear-btn';
@@ -1673,7 +1999,7 @@
         paidInput.value = '';
         rows[idx].paid = '';
         rows[idx].paidBool = false;
-        saveRows();
+        saveTableData();
         updateSummary();
         render();
       });
@@ -1717,11 +2043,10 @@
         if (currentBalance > 0) {
           // Permanently deduct paid amount from available cash before clearing
           availableCash = Math.max(0, availableCash - paidAmt);
-          localStorage.setItem('finances_available_cash', availableCash);
           rows[idx].bill = formatMoney(currentBalance);
           rows[idx].paid = '';
           rows[idx].paidBool = false;
-          saveRows();
+          saveTableData();
           render();
           updateSummary();
         }
@@ -1734,7 +2059,7 @@
       deleteBtn.addEventListener('click', () => {
         if (confirm('Delete this bill?')) {
           rows.splice(idx, 1);
-          saveRows();
+          saveTableData();
           render();
         }
       });
@@ -1780,18 +2105,12 @@
     document.getElementById('availableCash').addEventListener('blur', function (e) {
       const val = parseMoney(e.target.textContent);
       availableCash = val;
-      localStorage.setItem('finances_available_cash', val);
+      saveTableData();
       updateSummary();
     });
 
-    // Load available cash from storage
-    function loadAvailableCash() {
-      const saved = localStorage.getItem('finances_available_cash');
-      if (saved) availableCash = parseFloat(saved) || 0;
-    }
-
     // Buttons
-    document.getElementById('addRow').addEventListener('click', () => { rows.push({ owes: '', bill: '', paid: '', dueDate: '' }); saveRows(); render(); });
+    document.getElementById('addRow').addEventListener('click', () => { rows.push({ owes: '', bill: '', paid: '', dueDate: '' }); saveTableData(); render(); });
     document.getElementById('clearAll').addEventListener('click', () => {
       if (confirm('Clear all bill amounts and paid amounts?')) {
         rows.forEach(row => {
@@ -1799,7 +2118,7 @@
           row.paid = '';
           row.paidBool = false;
         });
-        saveRows();
+        saveTableData();
         render();
         updateSummary();
       }
@@ -1846,10 +2165,9 @@
             // Import available cash if present
             if (typeof data.availableCash === 'number') {
               availableCash = data.availableCash;
-              localStorage.setItem('finances_available_cash', availableCash);
             }
             sortRowsByDueDate();
-            saveRows();
+            saveTableData();
             render();
             alert('Import successful! ' + rows.length + ' bills imported.');
           } else {
@@ -1876,13 +2194,17 @@
       }
     });
 
-    // initial render
-    loadAvailableCash();
-    // Ensure all rows have dueDate field (for existing data)
-    rows.forEach(r => { if (!r.hasOwnProperty('dueDate')) r.dueDate = ''; });
-    sortRowsByDueDate();
-    saveRows();
-    render();
+    // Startup sequence
+    migrateIfNeeded();
+    loadRegistry();
+    initLockScreen();
+    // If no lock screen shown (no main password), do initial render
+    if (lockScreen.classList.contains('hidden')) {
+      rows.forEach(r => { if (!r.hasOwnProperty('dueDate')) r.dueDate = ''; });
+      sortRowsByDueDate();
+      saveTableData();
+      render();
+    }
 
   </script>
   <script>
