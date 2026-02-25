@@ -2,7 +2,7 @@
   "name": "Finances - Simple Manager",
   "short_name": "Finances",
   "description": "A simple personal finance manager",
-  "start_url": "./finances.html",
+  "start_url": "./index.html",
   "display": "standalone",
   "background_color": "#f8fafc",
   "theme_color": "#2563eb",

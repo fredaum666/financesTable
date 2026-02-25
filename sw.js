@@ -1,6 +1,6 @@
 const CACHE_NAME = 'finances-v1';
 const ASSETS = [
-  './finances.html',
+  './index.html',
   './manifest.json',
   './financeTableIcon.png'
 ];
