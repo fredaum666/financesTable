@@ -1,0 +1,1882 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
+  <title>Finances - Simple Manager</title>
+  <style>
+    :root {
+      --bg: #f8fafc;
+      --card: #fff;
+      --muted: #64748b;
+      --accent: #2563eb;
+      --danger: #dc2626;
+      --ok: #059669;
+      --shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+      --max-width: 1000px;
+      --border: #e2e8f0;
+      --text: #1e293b;
+    }
+
+    * {
+      box-sizing: border-box
+    }
+
+    body {
+      font-family: Inter, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial;
+      background: var(--bg);
+      margin: 0;
+      padding: 20px;
+      color: var(--text);
+      line-height: 1.5
+    }
+
+    .wrap {
+      max-width: var(--max-width);
+      margin: 0 auto
+    }
+
+    /* Header - more compact */
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 20px;
+      padding: 0 4px
+    }
+
+    header h1 {
+      font-size: 24px;
+      margin: 0;
+      font-weight: 700
+    }
+
+    header p {
+      margin: 4px 0 0 0;
+      color: var(--muted);
+      font-size: 14px
+    }
+
+    /* Main card - tighter spacing */
+    .card {
+      background: var(--card);
+      border-radius: 12px;
+      padding: 20px;
+      box-shadow: var(--shadow);
+      border: 1px solid var(--border)
+    }
+
+    /* Table - much more compact */
+    .table {
+      width: 100%;
+      border-collapse: separate;
+      border-spacing: 0 2px
+    }
+
+    table thead th {
+      font-weight: 600;
+      text-align: left;
+      padding: 8px 12px;
+      color: var(--muted);
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.025em;
+      border-bottom: 2px solid var(--border)
+    }
+
+    table tbody td {
+      background: transparent;
+      padding: 0
+    }
+
+    .row {
+      display: grid;
+      grid-template-columns: 2fr 1fr 80px 1fr 1fr 100px;
+      gap: 12px;
+      align-items: center;
+      padding: 8px 12px;
+      border-radius: 6px;
+      background: #fff;
+      border: 1px solid var(--border);
+      margin-bottom: 2px;
+      transition: all 0.2s ease
+    }
+
+    .row:hover {
+      background: #f8fafc;
+      border-color: var(--accent)
+    }
+
+    .row .cell {
+      padding: 0
+    }
+
+    /* Inputs - more compact */
+    .cell input[type='text'],
+    .cell input[type='number'] {
+      width: 100%;
+      padding: 6px 8px;
+      border-radius: 4px;
+      border: 1px solid var(--border);
+      font-size: 14px;
+      background: #fff;
+      transition: border-color 0.2s ease
+    }
+
+    .cell input:focus {
+      outline: none;
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1)
+    }
+
+    .cell input.invalid {
+      border-color: var(--danger);
+      box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.1)
+    }
+
+    /* Actions - smaller buttons */
+    .actions {
+      display: flex;
+      gap: 6px
+    }
+
+    button {
+      cursor: pointer;
+      font-size: 13px;
+      transition: all 0.2s ease
+    }
+
+    .btn {
+      border: 0;
+      padding: 6px 12px;
+      border-radius: 6px;
+      background: var(--accent);
+      color: white;
+      font-weight: 500
+    }
+
+    .btn:hover {
+      background: #1d4ed8
+    }
+
+    .btn.ghost {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--muted);
+      font-weight: 500
+    }
+
+    .btn.ghost:hover {
+      background: #f1f5f9;
+      border-color: var(--muted)
+    }
+
+    .btn.danger {
+      background: var(--danger)
+    }
+
+    .btn.danger:hover {
+      background: #b91c1c
+    }
+
+    .btn.ok {
+      background: var(--ok)
+    }
+
+    /* Summary - redesigned for better hierarchy */
+    .summary-container {
+      margin-top: 16px;
+      padding-top: 16px;
+      border-top: 1px solid var(--border)
+    }
+
+    .summary {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 8px
+    }
+
+    .summary .item {
+      background: linear-gradient(135deg, #f8fafc, #f1f5f9);
+      padding: 12px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      text-align: center;
+      transition: transform 0.2s ease
+    }
+
+    .summary .item:hover {
+      transform: translateY(-1px)
+    }
+
+    .summary .label {
+      font-size: 11px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 4px
+    }
+
+    .summary .value {
+      font-weight: 700;
+      font-size: 16px;
+      color: var(--text)
+    }
+
+    .summary .value.positive {
+      color: var(--ok)
+    }
+
+    .summary .value.negative {
+      color: var(--danger)
+    }
+
+    /* Footer - more compact */
+    .footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 12px;
+      font-size: 12px
+    }
+
+    .footer .left {
+      color: var(--muted)
+    }
+
+    /* Mobile optimizations - increased breakpoint for high-res phones */
+    @media (max-width:1024px) {
+      body {
+        padding: 1px;
+        font-size: 14px;
+        margin: 0
+      }
+
+      /* Mobile header - ultra compact */
+      header {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 3px;
+        margin-bottom: 4px;
+        padding: 4px;
+        background: white;
+        border-radius: 4px;
+        box-shadow: var(--shadow);
+        border: 1px solid var(--border)
+      }
+
+      header h1 {
+        font-size: 20px;
+        text-align: center;
+        margin: 0;
+        color: var(--accent)
+      }
+
+      header p {
+        text-align: center;
+        font-size: 11px;
+        margin: 2px 0 0 0
+      }
+
+      .actions {
+        width: 100%;
+        justify-content: center;
+        flex-wrap: wrap;
+        gap: 2px;
+        margin-top: 3px
+      }
+
+      .actions .btn {
+        padding: 4px 8px;
+        font-size: 12px;
+        min-height: 30px;
+        flex: 1;
+        min-width: 80px;
+        border-radius: 3px;
+        font-weight: 600
+      }
+
+      /* Mobile compact table - borderless for max space */
+      .table {
+        display: none
+      }
+
+      .mobile-table {
+        display: block !important;
+        width: 100%;
+        background: transparent;
+        border: none;
+        box-shadow: none;
+        margin: 0
+      }
+
+      .mobile-row {
+        display: flex;
+        border-bottom: 1px solid #e2e8f0;
+        min-height: 40px;
+        align-items: center;
+        padding: 1px;
+        font-size: 11px
+      }
+
+      .mobile-row:last-child {
+        border-bottom: none
+      }
+
+      .mobile-row:nth-child(even) {
+        background: #f8fafc
+      }
+
+      .mobile-row:hover {
+        background: #e2e8f0
+      }
+
+      /* Remove card container on mobile */
+      .card {
+        background: transparent;
+        border: none;
+        box-shadow: none;
+        padding: 0
+      }
+
+      /* Mobile table columns - ultra tight */
+      .mobile-col {
+        flex: 1;
+        padding: 1px 2px;
+        display: flex;
+        align-items: center;
+        min-width: 0
+      }
+
+      .mobile-col:first-child {
+        flex: 2.5;
+        min-width: 0
+      }
+
+      /* Bill name - wider */
+      .mobile-col:nth-child(2) {
+        flex: 1.3;
+        min-width: 0
+      }
+
+      /* Bill amount */
+      .mobile-col:nth-child(3) {
+        flex: 1.3;
+        min-width: 0
+      }
+
+      /* Paid amount */
+      .mobile-col:nth-child(4) {
+        flex: 1.1;
+        min-width: 0
+      }
+
+      /* Balance */
+      .mobile-col:nth-child(5) {
+        flex: 0.8;
+        min-width: 0
+      }
+
+      /* Actions */
+
+      /* Mobile inputs - ultra compact */
+      .mobile-input {
+        width: 100%;
+        border: 1px solid #e2e8f0;
+        border-radius: 2px;
+        padding: 2px 18px 2px 4px;
+        font-size: 11px;
+        background: white;
+        min-height: 28px
+      }
+
+      .mobile-input:focus {
+        outline: none;
+        border-color: var(--accent);
+        box-shadow: 0 0 0 1px rgba(37, 99, 235, 0.2)
+      }
+
+      /* Input container with clear button - mobile optimized */
+      .mobile-input-container {
+        position: relative;
+        display: flex;
+        align-items: center
+      }
+
+      .mobile-clear-btn {
+        position: absolute;
+        right: 2px;
+        background: none;
+        border: none;
+        color: #cbd5e1;
+        cursor: pointer;
+        padding: 2px;
+        border-radius: 2px;
+        font-size: 12px;
+        opacity: 0.6;
+        transition: all 0.2s ease;
+        z-index: 1;
+        width: 18px;
+        height: 18px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: bold
+      }
+
+      .mobile-input:focus+.mobile-clear-btn {
+        opacity: 1;
+        color: var(--muted)
+      }
+
+      .mobile-clear-btn:active {
+        background: var(--danger);
+        color: white;
+        transform: scale(0.9)
+      }
+
+      /* Mobile paid toggle */
+      .mobile-paid-toggle {
+        background: var(--muted);
+        color: white;
+        border: none;
+        padding: 3px 6px;
+        border-radius: 3px;
+        font-size: 10px;
+        font-weight: 600;
+        cursor: pointer;
+        min-height: 28px;
+        width: 100%
+      }
+
+      .mobile-paid-toggle.paid {
+        background: var(--ok)
+      }
+
+      .mobile-paid-toggle.partial {
+        background: #f59e0b
+      }
+
+      /* Mobile balance display - ultra compact */
+      .mobile-balance-display {
+        font-weight: 600;
+        font-size: 10px;
+        text-align: center;
+        padding: 2px;
+        border-radius: 2px
+      }
+
+      .mobile-balance-display.positive {
+        color: var(--ok);
+        background: rgba(5, 150, 105, 0.1)
+      }
+
+      .mobile-balance-display.negative {
+        color: var(--danger);
+        background: rgba(220, 38, 38, 0.1)
+      }
+
+      .mobile-balance-display.zero {
+        color: var(--muted);
+        background: rgba(100, 116, 139, 0.1)
+      }
+
+      /* Mobile actions - ultra compact */
+      .mobile-actions {
+        display: flex;
+        flex-direction: column;
+        gap: 1px
+      }
+
+      .mobile-action-btn {
+        padding: 1px 2px;
+        font-size: 9px;
+        border-radius: 2px;
+        border: 1px solid var(--border);
+        background: white;
+        cursor: pointer;
+        min-width: 20px;
+        min-height: 18px
+      }
+
+      .mobile-action-btn.danger {
+        background: var(--danger);
+        color: white;
+        border-color: var(--danger)
+      }
+
+      .mobile-action-btn.transfer {
+        background: var(--accent);
+        color: white;
+        border-color: var(--accent)
+      }
+
+      /* Mobile header row */
+      .mobile-header {
+        background: var(--accent) !important;
+        color: white;
+        font-weight: 600;
+        font-size: 10px;
+        text-transform: uppercase;
+        letter-spacing: 0.3px
+      }
+
+      .mobile-header:hover {
+        background: var(--accent) !important
+      }
+
+      /* Summary mobile - ultra compact */
+      .summary {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 3px;
+        margin-top: 8px
+      }
+
+      .summary .item {
+        padding: 6px;
+        font-size: 13px
+      }
+
+      .summary .label {
+        font-size: 10px
+      }
+
+      .summary .value {
+        font-size: 14px
+      }
+
+      /* Footer mobile - ultra compact */
+      .footer {
+        flex-direction: column;
+        text-align: center;
+        gap: 4px;
+        font-size: 12px;
+        margin-top: 4px
+      }
+    }
+
+    /* Desktop table display */
+    .mobile-table {
+      display: none
+    }
+
+    /* Desktop overrides - restore normal desktop styling */
+    @media (min-width:1025px) {
+      body {
+        padding: 20px;
+        font-size: 16px;
+        margin: 0
+      }
+
+      header {
+        flex-direction: row;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 20px;
+        padding: 0 4px;
+        background: transparent;
+        border: none;
+        box-shadow: none
+      }
+
+      header h1 {
+        font-size: 24px;
+        margin: 0;
+        font-weight: 700
+      }
+
+      header p {
+        margin: 4px 0 0 0;
+        color: var(--muted);
+        font-size: 14px
+      }
+
+      .actions {
+        width: auto;
+        justify-content: flex-end;
+        flex-wrap: nowrap;
+        gap: 6px;
+        margin-top: 0
+      }
+
+      .actions .btn {
+        padding: 6px 12px;
+        font-size: 13px;
+        min-height: auto;
+        flex: none;
+        min-width: auto;
+        border-radius: 6px;
+        font-weight: 500
+      }
+
+      .card {
+        background: var(--card);
+        border-radius: 12px;
+        padding: 20px;
+        box-shadow: var(--shadow);
+        border: 1px solid var(--border)
+      }
+
+      .table {
+        display: block
+      }
+
+      .mobile-table {
+        display: none !important
+      }
+
+      .summary {
+        grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+        gap: 8px;
+        margin-top: 16px
+      }
+
+      .summary .item {
+        padding: 12px;
+        font-size: 16px
+      }
+
+      .summary .label {
+        font-size: 11px
+      }
+
+      .summary .value {
+        font-size: 16px
+      }
+
+      .footer {
+        flex-direction: row;
+        text-align: left;
+        gap: 0;
+        font-size: 12px;
+        margin-top: 12px
+      }
+    }
+
+    @media (max-width:480px) {
+      body {
+        padding: 4px
+      }
+
+      header h1 {
+        font-size: 24px
+      }
+
+      .mobile-card {
+        padding: 12px
+      }
+
+      .actions .btn {
+        min-width: 100px;
+        font-size: 14px
+      }
+    }
+
+    /* Row actions - always visible for mobile */
+    .row-actions {
+      display: flex;
+      gap: 4px;
+      opacity: 1
+    }
+
+    .row-actions .btn {
+      padding: 4px 6px;
+      font-size: 11px
+    }
+
+    /* Input container with clear button */
+    .input-container {
+      position: relative;
+      display: flex;
+      align-items: center
+    }
+
+    .clear-btn {
+      position: absolute;
+      right: 4px;
+      background: none;
+      border: none;
+      color: var(--muted);
+      cursor: pointer;
+      padding: 2px;
+      border-radius: 3px;
+      font-size: 12px;
+      opacity: 0;
+      transition: opacity 0.2s ease
+    }
+
+    .input-container:hover .clear-btn {
+      opacity: 1
+    }
+
+    .clear-btn:hover {
+      background: var(--danger);
+      color: white
+    }
+
+    /* Paid button styling */
+    .paid-btn {
+      background: var(--muted);
+      color: white;
+      border: none;
+      padding: 8px 12px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 500;
+      transition: all 0.2s ease;
+      width: 100%
+    }
+
+    .paid-btn.paid {
+      background: var(--ok)
+    }
+
+    .paid-btn.partial {
+      background: #f59e0b
+    }
+
+    .paid-btn:hover {
+      transform: translateY(-1px)
+    }
+
+    /* Balance display */
+    .balance {
+      font-weight: 600;
+      text-align: center;
+      padding: 6px 8px;
+      border-radius: 4px;
+      font-size: 13px
+    }
+
+    .balance.positive {
+      color: var(--ok);
+      background: rgba(5, 150, 105, 0.1)
+    }
+
+    .balance.negative {
+      color: var(--danger);
+      background: rgba(220, 38, 38, 0.1)
+    }
+
+    .balance.zero {
+      color: var(--muted);
+      background: rgba(100, 116, 139, 0.1)
+    }
+
+    /* Header row styling */
+    .row.header {
+      background: transparent;
+      padding: 0;
+      border: none;
+      margin-bottom: 8px
+    }
+
+    .row.header:hover {
+      background: transparent;
+      border: none
+    }
+
+    /* Checkbox styling */
+    .paid-toggle {
+      display: flex;
+      align-items: center;
+      justify-content: center
+    }
+
+    .paid-toggle input {
+      width: 16px;
+      height: 16px;
+      accent-color: var(--ok)
+    }
+
+    .no-data {
+      padding: 40px 20px;
+      text-align: center;
+      color: var(--muted);
+      font-style: italic
+    }
+
+    /* Lock screen */
+    .lock-screen {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: linear-gradient(135deg, #1e293b, #334155);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 2000
+    }
+
+    .lock-screen.hidden {
+      display: none
+    }
+
+    .lock-box {
+      background: var(--card);
+      border-radius: 16px;
+      padding: 32px;
+      max-width: 360px;
+      width: 90%;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+      text-align: center
+    }
+
+    .lock-box h2 {
+      margin: 0 0 8px 0;
+      font-size: 24px;
+      color: var(--text)
+    }
+
+    .lock-box p {
+      margin: 0 0 24px 0;
+      color: var(--muted);
+      font-size: 14px
+    }
+
+    .lock-box input {
+      width: 100%;
+      padding: 12px 16px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      font-size: 16px;
+      text-align: center;
+      letter-spacing: 2px;
+      margin-bottom: 16px
+    }
+
+    .lock-box input:focus {
+      outline: none;
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1)
+    }
+
+    .lock-box .btn {
+      width: 100%;
+      padding: 12px;
+      font-size: 16px
+    }
+
+    .lock-error {
+      color: var(--danger);
+      font-size: 13px;
+      margin-bottom: 12px;
+      display: none
+    }
+
+    .lock-error.show {
+      display: block
+    }
+
+    /* Modal styles */
+    .modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.5);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+      padding: 20px
+    }
+
+    .modal-overlay.active {
+      display: flex
+    }
+
+    .modal {
+      background: var(--card);
+      border-radius: 12px;
+      padding: 24px;
+      max-width: 400px;
+      width: 100%;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
+      animation: modalIn 0.2s ease
+    }
+
+    @keyframes modalIn {
+      from {
+        opacity: 0;
+        transform: scale(0.95)
+      }
+
+      to {
+        opacity: 1;
+        transform: scale(1)
+      }
+    }
+
+    .modal h2 {
+      margin: 0 0 20px 0;
+      font-size: 18px;
+      color: var(--text)
+    }
+
+    .modal-field {
+      margin-bottom: 16px
+    }
+
+    .modal-field label {
+      display: block;
+      font-size: 12px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 6px;
+      font-weight: 600
+    }
+
+    .modal-field input {
+      width: 100%;
+      padding: 10px 12px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      font-size: 14px;
+      background: #fff
+    }
+
+    .modal-field input:focus {
+      outline: none;
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1)
+    }
+
+    .modal-actions {
+      display: flex;
+      gap: 10px;
+      justify-content: flex-end;
+      margin-top: 20px
+    }
+
+    .modal-actions .btn {
+      padding: 10px 20px
+    }
+
+    /* Clickable bill name */
+    .bill-name-clickable {
+      cursor: pointer;
+      padding: 6px 8px;
+      border-radius: 4px;
+      transition: background 0.2s ease;
+      display: flex;
+      flex-direction: column;
+      gap: 2px
+    }
+
+    .bill-name-clickable:hover {
+      background: rgba(37, 99, 235, 0.1)
+    }
+
+    .bill-name-text {
+      font-weight: 500
+    }
+
+    .bill-due-date {
+      font-size: 11px;
+      color: var(--muted)
+    }
+
+    .bill-due-date.overdue {
+      color: var(--danger);
+      font-weight: 600
+    }
+
+    .bill-due-date.due-soon {
+      color: #f59e0b;
+      font-weight: 600
+    }
+
+    /* Utility classes */
+    .muted {
+      color: var(--muted)
+    }
+
+    .text-center {
+      text-align: center
+    }
+
+    .font-medium {
+      font-weight: 500
+    }
+  </style>
+</head>
+
+<body>
+  <div class="wrap">
+    <header>
+      <div>
+        <h1>Finances</h1>
+        <p class="muted">Simple bills & payments manager — works offline and saves in your browser</p>
+      </div>
+      <div class="actions">
+        <button id="passwordBtn" class="btn ghost">Password</button>
+        <button id="exportJson" class="btn ghost">Export JSON</button>
+        <button id="importJson" class="btn ghost">Import JSON</button>
+        <button id="exportCsv" class="btn ghost">Export CSV</button>
+        <button id="clearAll" class="btn ghost">Clear All</button>
+        <button id="addRow" class="btn">+ Add Row</button>
+        <input type="file" id="fileInput" accept=".json" style="display:none">
+      </div>
+    </header>
+
+    <div class="card">
+      <!-- Desktop table view -->
+      <div style="overflow:auto">
+        <table class="table" id="dataTable" aria-live="polite">
+          <thead>
+            <tr class="row header">
+              <th class="cell">Owes</th>
+              <th class="cell">Bill</th>
+              <th class="cell">Status</th>
+              <th class="cell">Paid Amount</th>
+              <th class="cell">Balance</th>
+              <th class="cell">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="tbody">
+            <!-- rows inserted here -->
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Mobile compact table view -->
+      <div class="mobile-table" id="mobileTable">
+        <!-- mobile table rows inserted here -->
+      </div>
+
+      <div id="noData" class="no-data" style="display:none">No bills yet — add one to get started</div>
+
+      <div class="summary-container">
+        <div class="summary">
+          <div class="item">
+            <div class="label">Available Cash</div>
+            <div id="availableCash" class="value" contenteditable="true" title="Click to edit">$0.00</div>
+          </div>
+          <div class="item">
+            <div class="label">Total Bills</div>
+            <div id="totalBills" class="value">$0.00</div>
+          </div>
+          <div class="item">
+            <div class="label">Total Paid</div>
+            <div id="totalPaid" class="value">$0.00</div>
+          </div>
+          <div class="item">
+            <div class="label">Still Owe</div>
+            <div id="totalBalance" class="value">$0.00</div>
+          </div>
+          <div class="item">
+            <div class="label">Remaining Cash</div>
+            <div id="remainingCash" class="value">$0.00</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="footer">
+        <div class="left muted">Data stored locally in browser • Export CSV for backup</div>
+      </div>
+    </div>
+
+    <div style="margin-top:12px;color:var(--muted);font-size:13px">Tip: Click a bill name to edit name and due date.
+      Changes autosave.</div>
+  </div>
+
+  <!-- Lock Screen -->
+  <div class="lock-screen" id="lockScreen">
+    <div class="lock-box">
+      <h2>Finances Locked</h2>
+      <p>Enter your password to access</p>
+      <div class="lock-error" id="lockError">Incorrect password</div>
+      <input type="password" id="lockPassword" placeholder="Password" autocomplete="off">
+      <button class="btn" id="unlockBtn">Unlock</button>
+    </div>
+  </div>
+
+  <!-- Password Setup/Change Modal -->
+  <div class="modal-overlay" id="passwordModal">
+    <div class="modal">
+      <h2 id="passwordModalTitle">Set Password</h2>
+      <div class="modal-field">
+        <label for="newPassword">Password</label>
+        <input type="password" id="newPassword" placeholder="Enter password">
+      </div>
+      <div class="modal-field">
+        <label for="confirmPassword">Confirm Password</label>
+        <input type="password" id="confirmPassword" placeholder="Confirm password">
+      </div>
+      <div class="lock-error" id="passwordError"></div>
+      <div class="modal-actions">
+        <button class="btn ghost" id="passwordCancel">Cancel</button>
+        <button class="btn danger" id="removePassword" style="display:none">Remove</button>
+        <button class="btn" id="passwordSave">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Edit Bill Modal -->
+  <div class="modal-overlay" id="editModal">
+    <div class="modal">
+      <h2>Edit Bill</h2>
+      <div class="modal-field">
+        <label for="modalBillName">Bill Name</label>
+        <input type="text" id="modalBillName" placeholder="Enter bill name">
+      </div>
+      <div class="modal-field">
+        <label for="modalDueDate">Due Day (1-31)</label>
+        <input type="number" id="modalDueDate" min="1" max="31" placeholder="e.g. 15">
+      </div>
+      <div class="modal-actions">
+        <button class="btn ghost" id="modalCancel">Cancel</button>
+        <button class="btn" id="modalSave">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Password protection
+    const PW_KEY = 'finances_password';
+    const lockScreen = document.getElementById('lockScreen');
+    const lockPassword = document.getElementById('lockPassword');
+    const lockError = document.getElementById('lockError');
+    const unlockBtn = document.getElementById('unlockBtn');
+
+    const passwordModal = document.getElementById('passwordModal');
+    const passwordModalTitle = document.getElementById('passwordModalTitle');
+    const newPassword = document.getElementById('newPassword');
+    const confirmPassword = document.getElementById('confirmPassword');
+    const passwordError = document.getElementById('passwordError');
+    const removePasswordBtn = document.getElementById('removePassword');
+
+    function getStoredPassword() {
+      return localStorage.getItem(PW_KEY) || '';
+    }
+
+    function hasPassword() {
+      return getStoredPassword() !== '';
+    }
+
+    function checkPassword(input) {
+      return input === getStoredPassword();
+    }
+
+    function setPassword(pw) {
+      if (pw) {
+        localStorage.setItem(PW_KEY, pw);
+      } else {
+        localStorage.removeItem(PW_KEY);
+      }
+    }
+
+    // Initialize lock screen
+    function initLockScreen() {
+      if (hasPassword()) {
+        lockScreen.classList.remove('hidden');
+        lockPassword.focus();
+      } else {
+        lockScreen.classList.add('hidden');
+      }
+    }
+
+    // Unlock
+    unlockBtn.addEventListener('click', tryUnlock);
+    lockPassword.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') tryUnlock();
+    });
+
+    function tryUnlock() {
+      if (checkPassword(lockPassword.value)) {
+        lockScreen.classList.add('hidden');
+        lockPassword.value = '';
+        lockError.classList.remove('show');
+      } else {
+        lockError.classList.add('show');
+        lockPassword.value = '';
+        lockPassword.focus();
+      }
+    }
+
+    // Password modal
+    document.getElementById('passwordBtn').addEventListener('click', openPasswordModal);
+    document.getElementById('passwordCancel').addEventListener('click', closePasswordModal);
+    document.getElementById('passwordSave').addEventListener('click', savePassword);
+    removePasswordBtn.addEventListener('click', removePassword);
+
+    passwordModal.addEventListener('click', (e) => {
+      if (e.target === passwordModal) closePasswordModal();
+    });
+
+    function openPasswordModal() {
+      passwordError.textContent = '';
+      passwordError.classList.remove('show');
+      newPassword.value = '';
+      confirmPassword.value = '';
+
+      if (hasPassword()) {
+        passwordModalTitle.textContent = 'Change Password';
+        removePasswordBtn.style.display = 'inline-block';
+      } else {
+        passwordModalTitle.textContent = 'Set Password';
+        removePasswordBtn.style.display = 'none';
+      }
+
+      passwordModal.classList.add('active');
+      newPassword.focus();
+    }
+
+    function closePasswordModal() {
+      passwordModal.classList.remove('active');
+    }
+
+    function savePassword() {
+      passwordError.classList.remove('show');
+
+      // Validate new password
+      if (!newPassword.value) {
+        passwordError.textContent = 'Please enter a password';
+        passwordError.classList.add('show');
+        return;
+      }
+
+      if (newPassword.value !== confirmPassword.value) {
+        passwordError.textContent = 'Passwords do not match';
+        passwordError.classList.add('show');
+        return;
+      }
+
+      setPassword(newPassword.value);
+      closePasswordModal();
+      alert('Password saved!');
+    }
+
+    function removePassword() {
+      if (confirm('Remove password protection?')) {
+        setPassword('');
+        closePasswordModal();
+        alert('Password removed!');
+      }
+    }
+
+    // Initialize lock on page load
+    initLockScreen();
+
+    // Simple finances manager - localStorage key
+    const LS_KEY = 'finances_v1_rows';
+
+    // Example initial data (converted from the screenshot you provided)
+    const initialRows = [
+      { owes: 'BoA Cash Adv Card', bill: '$1,824.00', paid: '$424.00', dueDate: '' },
+      { owes: 'BoA Travel Rew Card', bill: '$722.00', paid: '$322.00', dueDate: '' },
+      { owes: 'Paypal credit', bill: '$-', paid: '', dueDate: '' },
+      { owes: 'Cap QuickSilver Card', bill: '$863.00', paid: '$63.00', dueDate: '' },
+      { owes: 'Cap Savor Card', bill: '$190.00', paid: '$90.00', dueDate: '' },
+      { owes: 'Venmo Card', bill: '$494.00', paid: '$94.00', dueDate: '' },
+      { owes: 'Amazon Card', bill: '$0.00', paid: '', dueDate: '' },
+      { owes: 'Home Depot Card', bill: '$260.00', paid: '$60.00', dueDate: '' },
+      { owes: 'Apple Card', bill: '$250.00', paid: '$50.00', dueDate: '' },
+      { owes: 'Best Buy Card', bill: '$', paid: '', dueDate: '' },
+      { owes: 'Prudencial Life Insurance', bill: '$1,177.00', paid: '', dueDate: '' },
+      { owes: 'House Utilities', bill: '', paid: '', dueDate: '' },
+      { owes: 'Built Card', bill: '$5,780.00', paid: '', dueDate: '' },
+      { owes: 'Total Bills', bill: '$5,780.00', paid: '', dueDate: '' }
+    ];
+
+    // Utility: parse currency-like strings into number
+    function parseMoney(val) {
+      if (val === null || val === undefined) return 0;
+      if (typeof val === 'number') return val;
+      const s = String(val).replace(/[^0-9.\-]/g, '').trim();
+      if (s === '') return 0;
+      return Number(s) || 0;
+    }
+
+    function formatMoney(n) {
+      return '$' + n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+
+    // Format due day for display
+    function formatDueDay(day) {
+      if (!day) return '';
+      const d = parseInt(day);
+      if (isNaN(d) || d < 1 || d > 31) return '';
+      // Add ordinal suffix
+      const suffix = (d === 1 || d === 21 || d === 31) ? 'st' :
+        (d === 2 || d === 22) ? 'nd' :
+          (d === 3 || d === 23) ? 'rd' : 'th';
+      return d + suffix;
+    }
+
+    // Check if due day is overdue or due soon (relative to current month)
+    function getDueDateStatus(day) {
+      if (!day) return '';
+      const d = parseInt(day);
+      if (isNaN(d) || d < 1 || d > 31) return '';
+
+      const today = new Date();
+      const currentDay = today.getDate();
+      const daysInMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate();
+
+      // Adjust if due day exceeds days in current month
+      const effectiveDueDay = Math.min(d, daysInMonth);
+
+      const diff = effectiveDueDay - currentDay;
+
+      if (diff < 0) return 'overdue';
+      if (diff <= 3) return 'due-soon';
+      return '';
+    }
+
+    // Sort rows by due day (bills with no due day go to end)
+    function sortRowsByDueDate() {
+      rows.sort((a, b) => {
+        const aDay = parseInt(a.dueDate) || 0;
+        const bDay = parseInt(b.dueDate) || 0;
+        // Both have no date - maintain order
+        if (!aDay && !bDay) return 0;
+        // No date goes to end
+        if (!aDay) return 1;
+        if (!bDay) return -1;
+        // Compare days numerically
+        return aDay - bDay;
+      });
+    }
+
+    // Modal state
+    let editingRowIndex = null;
+    const editModal = document.getElementById('editModal');
+    const modalBillName = document.getElementById('modalBillName');
+    const modalDueDate = document.getElementById('modalDueDate');
+
+    function openEditModal(idx) {
+      editingRowIndex = idx;
+      modalBillName.value = rows[idx].owes || '';
+      modalDueDate.value = rows[idx].dueDate || '';
+      editModal.classList.add('active');
+      modalBillName.focus();
+    }
+
+    function closeEditModal() {
+      editModal.classList.remove('active');
+      editingRowIndex = null;
+    }
+
+    function saveEditModal() {
+      if (editingRowIndex !== null) {
+        rows[editingRowIndex].owes = modalBillName.value;
+        rows[editingRowIndex].dueDate = modalDueDate.value;
+        sortRowsByDueDate();
+        saveRows();
+        render();
+      }
+      closeEditModal();
+    }
+
+    // Modal event listeners
+    document.getElementById('modalCancel').addEventListener('click', closeEditModal);
+    document.getElementById('modalSave').addEventListener('click', saveEditModal);
+    editModal.addEventListener('click', (e) => {
+      if (e.target === editModal) closeEditModal();
+    });
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && editModal.classList.contains('active')) closeEditModal();
+      if (e.key === 'Enter' && editModal.classList.contains('active')) saveEditModal();
+    });
+
+    let rows = loadRows();
+
+    function loadRows() {
+      try {
+        const raw = localStorage.getItem(LS_KEY);
+        if (raw) { return JSON.parse(raw); }
+      } catch (e) { }
+      // fallback to initial rows
+      return initialRows.slice();
+    }
+
+    function saveRows() {
+      localStorage.setItem(LS_KEY, JSON.stringify(rows));
+    }
+
+    const tbody = document.getElementById('tbody');
+    const mobileTable = document.getElementById('mobileTable');
+    const noData = document.getElementById('noData');
+
+    function render() {
+      tbody.innerHTML = '';
+      mobileTable.innerHTML = '';
+
+      if (!rows || rows.length === 0) {
+        noData.style.display = 'block';
+        return;
+      }
+      noData.style.display = 'none';
+
+      // Add mobile header
+      renderMobileHeader();
+
+      rows.forEach((r, idx) => {
+        renderDesktopRow(r, idx);
+        renderMobileRow(r, idx);
+      });
+      updateSummary();
+    }
+
+    function renderDesktopRow(r, idx) {
+      const tr = document.createElement('tr');
+      tr.className = 'row';
+
+      // Owes (left) - clickable to open modal
+      const owes = document.createElement('td'); owes.className = 'cell';
+      const owesClickable = document.createElement('div'); owesClickable.className = 'bill-name-clickable';
+      const owesText = document.createElement('span'); owesText.className = 'bill-name-text'; owesText.textContent = r.owes || 'Click to add name';
+      owesClickable.appendChild(owesText);
+      if (r.dueDate) {
+        const dueDateSpan = document.createElement('span');
+        dueDateSpan.className = 'bill-due-date ' + getDueDateStatus(r.dueDate);
+        dueDateSpan.textContent = 'Due: ' + formatDueDay(r.dueDate);
+        owesClickable.appendChild(dueDateSpan);
+      }
+      owesClickable.addEventListener('click', () => openEditModal(idx));
+      owes.appendChild(owesClickable);
+
+      // Bill (center) with clear button
+      const bill = document.createElement('td'); bill.className = 'cell';
+      const billContainer = document.createElement('div'); billContainer.className = 'input-container';
+      const billInput = document.createElement('input'); billInput.type = 'text'; billInput.value = r.bill || '';
+      billInput.setAttribute('inputmode', 'decimal');
+      billInput.setAttribute('placeholder', '$0.00');
+      billInput.addEventListener('blur', e => {
+        const raw = (e.target.value || '').trim();
+        if (!raw) { rows[idx].bill = ''; e.target.value = ''; saveRows(); updateSummary(); return; }
+        if (!/\d/.test(raw)) { e.target.classList.add('invalid'); return; }
+        const n = parseMoney(raw);
+        rows[idx].bill = formatMoney(n);
+        e.target.value = rows[idx].bill;
+        e.target.classList.remove('invalid');
+        saveRows(); updateSummary();
+      });
+      billInput.addEventListener('input', e => { e.target.classList.remove('invalid'); });
+      billInput.addEventListener('dblclick', e => e.target.select());
+      const billClearBtn = document.createElement('button'); billClearBtn.className = 'clear-btn'; billClearBtn.innerHTML = '×'; billClearBtn.title = 'Clear';
+      billClearBtn.addEventListener('click', () => { billInput.value = ''; rows[idx].bill = ''; saveRows(); updateSummary(); });
+      billContainer.appendChild(billInput); billContainer.appendChild(billClearBtn);
+      bill.appendChild(billContainer);
+
+      // Paid button with partial payment logic
+      const paid = document.createElement('td'); paid.className = 'cell';
+      const paidBtn = document.createElement('button'); paidBtn.className = 'paid-btn';
+
+      const billAmount = parseMoney(r.bill);
+      const paidAmount = parseMoney(r.paid);
+      const balance = billAmount - paidAmount;
+
+      if (paidAmount === 0) {
+        paidBtn.textContent = 'UNPAID';
+        paidBtn.className = 'paid-btn';
+      } else if (balance <= 0) {
+        paidBtn.textContent = 'PAID';
+        paidBtn.className = 'paid-btn paid';
+      } else {
+        paidBtn.textContent = 'PARTIAL';
+        paidBtn.className = 'paid-btn partial';
+      }
+
+      paidBtn.addEventListener('click', () => {
+        const billAmt = parseMoney(rows[idx].bill);
+        const paidAmt = parseMoney(rows[idx].paid);
+        const bal = billAmt - paidAmt;
+
+        if (paidAmt > 0 && bal > 0) {
+          // PARTIAL → transfer: permanently deduct paid from available cash, roll balance into bill
+          availableCash = Math.max(0, availableCash - paidAmt);
+          localStorage.setItem('finances_available_cash', availableCash);
+          rows[idx].bill = formatMoney(bal);
+          rows[idx].paid = '';
+          rows[idx].paidBool = false;
+        } else if (paidAmt === 0 && billAmt > 0) {
+          // UNPAID → mark fully paid
+          rows[idx].paid = rows[idx].bill;
+          rows[idx].paidBool = true;
+        } else {
+          // PAID → reset to unpaid
+          rows[idx].paid = '';
+          rows[idx].paidBool = false;
+        }
+        saveRows(); render(); updateSummary();
+      });
+      paid.appendChild(paidBtn);
+
+      // Paid amount with clear button
+      const paidAmt = document.createElement('td'); paidAmt.className = 'cell';
+      const paidContainer = document.createElement('div'); paidContainer.className = 'input-container';
+      const paidInput = document.createElement('input'); paidInput.type = 'text'; paidInput.value = r.paid || '';
+      paidInput.setAttribute('inputmode', 'decimal');
+      paidInput.setAttribute('placeholder', '$0.00');
+      paidInput.addEventListener('blur', e => {
+        const raw = (e.target.value || '').trim();
+        if (!raw) { rows[idx].paid = ''; rows[idx].paidBool = false; e.target.value = ''; saveRows(); updateSummary(); render(); return; }
+        if (!/\d/.test(raw)) { e.target.classList.add('invalid'); return; }
+        const n = parseMoney(raw);
+        rows[idx].paid = formatMoney(n);
+        rows[idx].paidBool = n > 0;
+        e.target.value = rows[idx].paid;
+        e.target.classList.remove('invalid');
+        saveRows(); updateSummary(); render();
+      });
+      paidInput.addEventListener('input', e => { e.target.classList.remove('invalid'); });
+      paidInput.addEventListener('dblclick', e => e.target.select());
+      const paidClearBtn = document.createElement('button'); paidClearBtn.className = 'clear-btn'; paidClearBtn.innerHTML = '×'; paidClearBtn.title = 'Clear';
+      paidClearBtn.addEventListener('click', () => { paidInput.value = ''; rows[idx].paid = ''; rows[idx].paidBool = false; saveRows(); updateSummary(); render(); });
+      paidContainer.appendChild(paidInput); paidContainer.appendChild(paidClearBtn);
+      paidAmt.appendChild(paidContainer);
+
+      // Balance column - shows remaining amount owed
+      const balanceCell = document.createElement('td'); balanceCell.className = 'cell';
+      const balanceDiv = document.createElement('div'); balanceDiv.className = 'balance';
+      const billAmt = parseMoney(r.bill);
+      const paidAmt2 = parseMoney(r.paid);
+      const balanceAmount = billAmt - paidAmt2;
+
+      balanceDiv.textContent = formatMoney(balanceAmount);
+      if (balanceAmount > 0) {
+        balanceDiv.classList.add('negative'); // Still owe money
+      } else if (balanceAmount < 0) {
+        balanceDiv.classList.add('positive'); // Overpaid
+      } else {
+        balanceDiv.classList.add('zero'); // Paid in full
+      }
+      balanceCell.appendChild(balanceDiv);
+
+      // Row actions - inline with the row
+      const actionsCell = document.createElement('td'); actionsCell.className = 'cell';
+      const actionsDiv = document.createElement('div'); actionsDiv.className = 'row-actions';
+      const up = document.createElement('button'); up.className = 'btn ghost'; up.innerHTML = '↑'; up.title = 'Move up'; up.addEventListener('click', () => { if (idx > 0) { const a = rows[idx - 1]; rows[idx - 1] = rows[idx]; rows[idx] = a; saveRows(); render(); } });
+      const down = document.createElement('button'); down.className = 'btn ghost'; down.innerHTML = '↓'; down.title = 'Move down'; down.addEventListener('click', () => { if (idx < rows.length - 1) { const a = rows[idx + 1]; rows[idx + 1] = rows[idx]; rows[idx] = a; saveRows(); render(); } });
+      const del = document.createElement('button'); del.className = 'btn danger'; del.innerHTML = '×'; del.title = 'Delete'; del.addEventListener('click', () => { if (confirm('Delete this bill?')) { rows.splice(idx, 1); saveRows(); render(); updateSummary(); } });
+      actionsDiv.appendChild(up); actionsDiv.appendChild(down); actionsDiv.appendChild(del);
+      actionsCell.appendChild(actionsDiv);
+
+      tr.appendChild(owes); tr.appendChild(bill); tr.appendChild(paid); tr.appendChild(paidAmt); tr.appendChild(balanceCell); tr.appendChild(actionsCell);
+      tbody.appendChild(tr);
+    }
+
+    function renderMobileHeader() {
+      const headerRow = document.createElement('div');
+      headerRow.className = 'mobile-row mobile-header';
+
+      const headers = ['Bill Name', 'Amount', 'Paid', 'Balance', 'Actions'];
+      headers.forEach(text => {
+        const col = document.createElement('div');
+        col.className = 'mobile-col';
+        col.textContent = text;
+        headerRow.appendChild(col);
+      });
+
+      mobileTable.appendChild(headerRow);
+    }
+
+    function renderMobileRow(r, idx) {
+      const row = document.createElement('div');
+      row.className = 'mobile-row';
+
+      // Bill Name column - clickable to open modal
+      const nameCol = document.createElement('div');
+      nameCol.className = 'mobile-col';
+      const nameClickable = document.createElement('div');
+      nameClickable.className = 'bill-name-clickable';
+      nameClickable.style.padding = '2px 4px';
+      const nameText = document.createElement('span');
+      nameText.className = 'bill-name-text';
+      nameText.style.fontSize = '11px';
+      nameText.textContent = r.owes || 'Tap to add';
+      nameClickable.appendChild(nameText);
+      if (r.dueDate) {
+        const dueDateSpan = document.createElement('span');
+        dueDateSpan.className = 'bill-due-date ' + getDueDateStatus(r.dueDate);
+        dueDateSpan.style.fontSize = '9px';
+        dueDateSpan.textContent = 'Due: ' + formatDueDay(r.dueDate);
+        nameClickable.appendChild(dueDateSpan);
+      }
+      nameClickable.addEventListener('click', () => openEditModal(idx));
+      nameCol.appendChild(nameClickable);
+
+      // Bill Amount column
+      const billCol = document.createElement('div');
+      billCol.className = 'mobile-col';
+      const billContainer = document.createElement('div');
+      billContainer.className = 'mobile-input-container';
+      const billInput = document.createElement('input');
+      billInput.className = 'mobile-input';
+      billInput.value = r.bill || '';
+      billInput.placeholder = '$0';
+      billInput.addEventListener('blur', e => {
+        const raw = (e.target.value || '').trim();
+        if (!raw) { rows[idx].bill = ''; e.target.value = ''; saveRows(); updateSummary(); render(); return; }
+        if (!/\d/.test(raw)) { e.target.classList.add('invalid'); return; }
+        const n = parseMoney(raw);
+        rows[idx].bill = formatMoney(n);
+        e.target.value = rows[idx].bill;
+        e.target.classList.remove('invalid');
+        saveRows(); updateSummary(); render();
+      });
+      const billClearBtn = document.createElement('button');
+      billClearBtn.className = 'mobile-clear-btn';
+      billClearBtn.innerHTML = '×';
+      billClearBtn.addEventListener('click', () => {
+        billInput.value = '';
+        rows[idx].bill = '';
+        saveRows();
+        updateSummary();
+        render();
+      });
+      billContainer.appendChild(billInput);
+      billContainer.appendChild(billClearBtn);
+      billCol.appendChild(billContainer);
+
+      // Paid Amount column
+      const paidCol = document.createElement('div');
+      paidCol.className = 'mobile-col';
+      const paidContainer = document.createElement('div');
+      paidContainer.className = 'mobile-input-container';
+      const paidInput = document.createElement('input');
+      paidInput.className = 'mobile-input';
+      paidInput.value = r.paid || '';
+      paidInput.placeholder = '$0';
+      paidInput.addEventListener('blur', e => {
+        const raw = (e.target.value || '').trim();
+        if (!raw) { rows[idx].paid = ''; rows[idx].paidBool = false; e.target.value = ''; saveRows(); updateSummary(); render(); return; }
+        if (!/\d/.test(raw)) { e.target.classList.add('invalid'); return; }
+        const n = parseMoney(raw);
+        rows[idx].paid = formatMoney(n);
+        rows[idx].paidBool = n > 0;
+        e.target.value = rows[idx].paid;
+        e.target.classList.remove('invalid');
+        saveRows(); updateSummary(); render();
+      });
+      const paidClearBtn = document.createElement('button');
+      paidClearBtn.className = 'mobile-clear-btn';
+      paidClearBtn.innerHTML = '×';
+      paidClearBtn.addEventListener('click', () => {
+        paidInput.value = '';
+        rows[idx].paid = '';
+        rows[idx].paidBool = false;
+        saveRows();
+        updateSummary();
+        render();
+      });
+      paidContainer.appendChild(paidInput);
+      paidContainer.appendChild(paidClearBtn);
+      paidCol.appendChild(paidContainer);
+
+      // Balance column
+      const balanceCol = document.createElement('div');
+      balanceCol.className = 'mobile-col';
+      const balanceDiv = document.createElement('div');
+      balanceDiv.className = 'mobile-balance-display';
+      const billAmount = parseMoney(r.bill);
+      const paidAmount = parseMoney(r.paid);
+      const balance = billAmount - paidAmount;
+
+      balanceDiv.textContent = formatMoney(balance);
+      if (balance > 0) {
+        balanceDiv.classList.add('negative');
+      } else if (balance < 0) {
+        balanceDiv.classList.add('positive');
+      } else {
+        balanceDiv.classList.add('zero');
+      }
+      balanceCol.appendChild(balanceDiv);
+
+      // Actions column
+      const actionsCol = document.createElement('div');
+      actionsCol.className = 'mobile-col';
+      actionsCol.style.display = 'flex';
+      actionsCol.style.gap = '2px';
+      actionsCol.style.flexDirection = 'column';
+
+      const transferBtn = document.createElement('button');
+      transferBtn.className = 'mobile-action-btn transfer';
+      transferBtn.innerHTML = '↻';
+      transferBtn.title = 'Transfer balance to amount, clear paid';
+      transferBtn.addEventListener('click', () => {
+        const paidAmt = parseMoney(rows[idx].paid);
+        const currentBalance = parseMoney(rows[idx].bill) - paidAmt;
+        if (currentBalance > 0) {
+          // Permanently deduct paid amount from available cash before clearing
+          availableCash = Math.max(0, availableCash - paidAmt);
+          localStorage.setItem('finances_available_cash', availableCash);
+          rows[idx].bill = formatMoney(currentBalance);
+          rows[idx].paid = '';
+          rows[idx].paidBool = false;
+          saveRows();
+          render();
+          updateSummary();
+        }
+      });
+
+      const deleteBtn = document.createElement('button');
+      deleteBtn.className = 'mobile-action-btn danger';
+      deleteBtn.innerHTML = '×';
+      deleteBtn.title = 'Delete row';
+      deleteBtn.addEventListener('click', () => {
+        if (confirm('Delete this bill?')) {
+          rows.splice(idx, 1);
+          saveRows();
+          render();
+        }
+      });
+
+      actionsCol.appendChild(transferBtn);
+      actionsCol.appendChild(deleteBtn);
+
+      row.appendChild(nameCol);
+      row.appendChild(billCol);
+      row.appendChild(paidCol);
+      row.appendChild(balanceCol);
+      row.appendChild(actionsCol);
+
+      mobileTable.appendChild(row);
+    }
+
+    let availableCash = 0;
+
+    function updateSummary() {
+      // Excel-like calculations
+      const totalBills = rows.reduce((s, r) => s + parseMoney(r.bill), 0);
+      const totalPaid = rows.reduce((s, r) => s + parseMoney(r.paid), 0);
+      const totalBalance = totalBills - totalPaid; // How much still owed across all bills
+      const remainingCash = availableCash - totalPaid; // Available Cash minus what we've paid
+
+      document.getElementById('availableCash').textContent = formatMoney(availableCash);
+      document.getElementById('totalBills').textContent = formatMoney(totalBills);
+      document.getElementById('totalPaid').textContent = formatMoney(totalPaid);
+      document.getElementById('totalBalance').textContent = formatMoney(totalBalance);
+      document.getElementById('remainingCash').textContent = formatMoney(remainingCash);
+
+      // Add color coding
+      const remainingEl = document.getElementById('remainingCash');
+      const cashEl = document.getElementById('availableCash');
+      const balanceEl = document.getElementById('totalBalance');
+
+      remainingEl.className = 'value ' + (remainingCash >= 0 ? 'positive' : 'negative');
+      cashEl.className = 'value ' + (availableCash > 0 ? 'positive' : 'negative');
+      balanceEl.className = 'value ' + (totalBalance <= 0 ? 'positive' : 'negative');
+    }
+
+    // Make available cash editable
+    document.getElementById('availableCash').addEventListener('blur', function (e) {
+      const val = parseMoney(e.target.textContent);
+      availableCash = val;
+      localStorage.setItem('finances_available_cash', val);
+      updateSummary();
+    });
+
+    // Load available cash from storage
+    function loadAvailableCash() {
+      const saved = localStorage.getItem('finances_available_cash');
+      if (saved) availableCash = parseFloat(saved) || 0;
+    }
+
+    // Buttons
+    document.getElementById('addRow').addEventListener('click', () => { rows.push({ owes: '', bill: '', paid: '', dueDate: '' }); saveRows(); render(); });
+    document.getElementById('clearAll').addEventListener('click', () => {
+      if (confirm('Clear all bill amounts and paid amounts?')) {
+        rows.forEach(row => {
+          row.bill = '';
+          row.paid = '';
+          row.paidBool = false;
+        });
+        saveRows();
+        render();
+        updateSummary();
+      }
+    });
+    document.getElementById('exportCsv').addEventListener('click', () => { exportCSV(); });
+
+    function exportCSV() {
+      const header = ['Owes', 'Bill', 'Paid', 'Due Date'];
+      const lines = [header.join(',')];
+      rows.forEach(r => {
+        lines.push([`"${(r.owes || '').replace(/"/g, '""')}"`, (r.bill || ''), (r.paid || ''), (r.dueDate || '')].join(','));
+      });
+      const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a'); a.href = url; a.download = 'finances.csv'; a.click(); URL.revokeObjectURL(url);
+    }
+
+    function exportJSON() {
+      const data = {
+        version: 1,
+        exportDate: new Date().toISOString(),
+        availableCash: availableCash,
+        rows: rows
+      };
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a'); a.href = url; a.download = 'finances-backup.json'; a.click(); URL.revokeObjectURL(url);
+    }
+
+    function importJSON(file) {
+      const reader = new FileReader();
+      reader.onload = function (e) {
+        try {
+          const data = JSON.parse(e.target.result);
+          if (data.rows && Array.isArray(data.rows)) {
+            // Validate and import rows
+            rows = data.rows.map(r => ({
+              owes: r.owes || '',
+              bill: r.bill || '',
+              paid: r.paid || '',
+              dueDate: r.dueDate || '',
+              paidBool: r.paidBool || false
+            }));
+            // Import available cash if present
+            if (typeof data.availableCash === 'number') {
+              availableCash = data.availableCash;
+              localStorage.setItem('finances_available_cash', availableCash);
+            }
+            sortRowsByDueDate();
+            saveRows();
+            render();
+            alert('Import successful! ' + rows.length + ' bills imported.');
+          } else {
+            alert('Invalid file format. Expected a JSON file with a "rows" array.');
+          }
+        } catch (err) {
+          alert('Error reading file: ' + err.message);
+        }
+      };
+      reader.readAsText(file);
+    }
+
+    // JSON import/export event listeners
+    document.getElementById('exportJson').addEventListener('click', exportJSON);
+    document.getElementById('importJson').addEventListener('click', () => {
+      document.getElementById('fileInput').click();
+    });
+    document.getElementById('fileInput').addEventListener('change', (e) => {
+      if (e.target.files.length > 0) {
+        if (confirm('This will replace all current data. Continue?')) {
+          importJSON(e.target.files[0]);
+        }
+        e.target.value = ''; // Reset file input
+      }
+    });
+
+    // initial render
+    loadAvailableCash();
+    // Ensure all rows have dueDate field (for existing data)
+    rows.forEach(r => { if (!r.hasOwnProperty('dueDate')) r.dueDate = ''; });
+    sortRowsByDueDate();
+    saveRows();
+    render();
+
+  </script>
+</body>
+
+</html>
